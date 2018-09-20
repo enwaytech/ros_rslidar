@@ -628,7 +628,7 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
         }
         else if (distance2 < min_distance)
         {
-          assert(std::numeric_limits<float>::is_iec559);
+          static_assert(std::numeric_limits<float>::is_iec559, "Requires IEEE 754/iec 559 floating point format");
           point.x = -std::numeric_limits<float>::infinity();
           point.y = -std::numeric_limits<float>::infinity();
           point.z = -std::numeric_limits<float>::infinity();
@@ -776,7 +776,6 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
       }
       else if (distance2 < min_distance)
       {
-        assert(std::numeric_limits<float>::is_iec559);
         point.x = -std::numeric_limits<float>::infinity();
         point.y = -std::numeric_limits<float>::infinity();
         point.z = -std::numeric_limits<float>::infinity();
