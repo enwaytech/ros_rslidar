@@ -19,12 +19,29 @@
  */
 #include "rawdata.h"
 
+#include <cassert>
+#include <cmath>
+
 namespace rslidar_rawdata
 {
-RawData::RawData()
+RawData::RawData(ros::NodeHandle private_nh)
 {
   this->is_init_angle_ = false;
   this->is_init_curve_ = false;
+
+  private_nh.param<float>("start_angle_deg", start_angle_, 0.);
+  private_nh.param<float>("end_angle_deg", end_angle_, 360.);
+
+  assert(std::abs(start_angle_) <= 360.);
+  assert(std::abs(end_angle_) <= 360.);
+
+  start_angle_ = std::fmod(start_angle_ + 360., 360.);
+  end_angle_ = std::fmod(end_angle_ + 360., 360.);
+
+  ROS_INFO("Clipping horizontal angle to range [%f, %f] degree", start_angle_, end_angle_);
+
+  start_angle_ = start_angle_ * M_PI / 180.;
+  end_angle_ = end_angle_ * M_PI / 180.;
 }
 
 void RawData::loadConfigFile(ros::NodeHandle node, ros::NodeHandle private_nh)
@@ -37,6 +54,7 @@ void RawData::loadConfigFile(ros::NodeHandle node, ros::NodeHandle private_nh)
   private_nh.param("channel_path", channelPath, std::string(""));
   private_nh.param("curves_rate_path", curvesRatePath, std::string(""));
   private_nh.param("min_distance", min_distance, min_distance);
+
 
   private_nh.param("model", model, std::string("RS16"));
   if (model == "RS16")
@@ -598,6 +616,23 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
         azimuth_corrected_f = azimuth + (azimuth_diff * ((dsr * RS16_DSR_TOFFSET) + (firing * RS16_FIRING_TOFFSET)) /
                                          RS16_BLOCK_TDURATION);
         azimuth_corrected = ((int)round(azimuth_corrected_f)) % 36000;  // convert to integral value...
+        float arg_horiz = (float)azimuth_corrected / 18000.0f * M_PI;
+        float arg_vert = VERT_ANGLE[dsr];
+
+        if (start_angle_ < end_angle_)
+        {
+          if (arg_horiz < start_angle_ || arg_horiz > end_angle_)
+          {
+            continue;
+          }
+        }
+        else
+        {
+          if (arg_horiz < start_angle_ && arg_horiz > end_angle_)
+          {
+            continue;
+          }
+        }
 
         union two_bytes tmp;
         tmp.bytes[1] = raw->blocks[block].data[k];
@@ -614,8 +649,6 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
         float distance2 = pixelToDistance(distance, dsr);
         distance2 = distance2 * DISTANCE_RESOLUTION;
 
-        float arg_horiz = (float)azimuth_corrected / 18000.0f * M_PI;
-        float arg_vert = VERT_ANGLE[dsr];
         pcl::PointXYZI point;
 
         if (distance2 > DISTANCE_MAX)  // invalid data
@@ -745,6 +778,23 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
       }
       azimuth_corrected_f = azimuth + (azimuth_diff * ((dsr_temp * RS32_DSR_TOFFSET)) / RS32_BLOCK_TDURATION);
       azimuth_corrected = correctAzimuth(azimuth_corrected_f, dsr);
+      float arg_horiz = (float)azimuth_corrected / 18000.0f * M_PI;
+      float arg_vert = VERT_ANGLE[dsr];
+
+      if (start_angle_ < end_angle_)
+      {
+        if (arg_horiz < start_angle_ || arg_horiz > end_angle_)
+        {
+          continue;
+        }
+      }
+      else
+      {
+        if (arg_horiz < start_angle_ && arg_horiz > end_angle_)
+        {
+          continue;
+        }
+      }
 
       union two_bytes tmp;
       tmp.bytes[1] = raw->blocks[block].data[index];
@@ -762,8 +812,6 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
       float distance2 = pixelToDistance(distance, dsr);
       distance2 = distance2 * DISTANCE_RESOLUTION;
 
-      float arg_horiz = (float)azimuth_corrected / 18000.0f * M_PI;
-      float arg_vert = VERT_ANGLE[dsr];
       pcl::PointXYZI point;
 
       if (distance2 > DISTANCE_MAX)  // invalid data

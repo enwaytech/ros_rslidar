@@ -121,7 +121,7 @@ typedef struct raw_packet
 class RawData
 {
 public:
-  RawData();
+  RawData(ros::NodeHandle private_nh);
 
   ~RawData()
   {
@@ -160,6 +160,8 @@ public:
   bool is_init_curve_;
   bool is_init_angle_;
   int block_num = 0;
+  float start_angle_;
+  float end_angle_;
 };
 
 float VERT_ANGLE[32];

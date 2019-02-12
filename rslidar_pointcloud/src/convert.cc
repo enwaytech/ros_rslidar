@@ -21,7 +21,7 @@ namespace rslidar_pointcloud
 std::string model;
 
 /** @brief Constructor. */
-Convert::Convert(ros::NodeHandle node, ros::NodeHandle private_nh) : data_(new rslidar_rawdata::RawData())
+Convert::Convert(ros::NodeHandle node, ros::NodeHandle private_nh) : data_(new rslidar_rawdata::RawData(private_nh))
 {
   data_->loadConfigFile(node, private_nh);  // load lidar parameters
   private_nh.param("model", model, std::string("RS16"));
