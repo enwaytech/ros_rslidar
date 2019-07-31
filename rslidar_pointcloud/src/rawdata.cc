@@ -19,6 +19,8 @@
  */
 #include "rawdata.h"
 
+#include <limits>
+
 namespace rslidar_rawdata
 {
 RawData::RawData()
@@ -515,6 +517,7 @@ void RawData::processDifop(const rslidar_msgs::rslidarPacket::ConstPtr& difop_ms
             else
               VERT_ANGLE[loopn] = (bit2 * 256 + bit3) * symbolbit * 0.001f * 100;
             // horizontal offset angle
+
             bit1 = static_cast<int>(*(data + 564 + loopn * 3));
             if (bit1 == 0)
               symbolbit = 1;
@@ -932,13 +935,30 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
 
         pcl::PointXYZI point;
 
-        if (distance2 > max_distance_ || distance2 < min_distance_ ||
-            (angle_flag_ && (arg_horiz < start_angle_ || arg_horiz > end_angle_)) ||
+        if ((angle_flag_ && (arg_horiz < start_angle_ || arg_horiz > end_angle_)) ||
             (!angle_flag_ && (arg_horiz > end_angle_ && arg_horiz < start_angle_)))  // invalid distance
         {
           point.x = NAN;
           point.y = NAN;
           point.z = NAN;
+          point.intensity = 0;
+          pointcloud->at(2 * this->block_num + firing, dsr) = point;
+        }
+        else if (distance2 > max_distance_)
+        {
+          static_assert(std::numeric_limits<float>::is_iec559, "Requires IEEE 754/iec 559 floating point format");
+          point.x = std::numeric_limits<float>::infinity();
+          point.y = std::numeric_limits<float>::infinity();
+          point.z = std::numeric_limits<float>::infinity();
+          point.intensity = 0;
+          pointcloud->at(2 * this->block_num + firing, dsr) = point;
+        }
+        else if (distance2 < min_distance_)
+        {
+          static_assert(std::numeric_limits<float>::is_iec559, "Requires IEEE 754/iec 559 floating point format");
+          point.x = -std::numeric_limits<float>::infinity();
+          point.y = -std::numeric_limits<float>::infinity();
+          point.z = -std::numeric_limits<float>::infinity();
           point.intensity = 0;
           pointcloud->at(2 * this->block_num + firing, dsr) = point;
         }
@@ -1057,13 +1077,30 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
         int arg_vert = ((VERT_ANGLE[dsr]) % 36000 + 36000) % 36000;
         pcl::PointXYZI point;
 
-        if (distance2 > max_distance_ || distance2 < min_distance_ ||
-            (angle_flag_ && (arg_horiz < start_angle_ || arg_horiz > end_angle_)) ||
+        if ((angle_flag_ && (arg_horiz < start_angle_ || arg_horiz > end_angle_)) ||
             (!angle_flag_ && (arg_horiz > end_angle_ && arg_horiz < start_angle_)))  // invalid distance
         {
           point.x = NAN;
           point.y = NAN;
           point.z = NAN;
+          point.intensity = 0;
+          pointcloud->at(this->block_num, dsr) = point;
+        }
+        else if (distance2 > max_distance_)
+        {
+          static_assert(std::numeric_limits<float>::is_iec559, "Requires IEEE 754/iec 559 floating point format");
+          point.x = std::numeric_limits<float>::infinity();
+          point.y = std::numeric_limits<float>::infinity();
+          point.z = std::numeric_limits<float>::infinity();
+          point.intensity = 0;
+          pointcloud->at(this->block_num, dsr) = point;
+        }
+        else if (distance2 < min_distance_)
+        {
+          static_assert(std::numeric_limits<float>::is_iec559, "Requires IEEE 754/iec 559 floating point format");
+          point.x = -std::numeric_limits<float>::infinity();
+          point.y = -std::numeric_limits<float>::infinity();
+          point.z = -std::numeric_limits<float>::infinity();
           point.intensity = 0;
           pointcloud->at(this->block_num, dsr) = point;
         }
