@@ -178,6 +178,8 @@ private:
   float max_distance_;
   float min_distance_;
   int dis_resolution_mode_;
+  float start_clip_angle_;
+  float end_clip_angle_;
   int return_mode_;
   bool info_print_flag_;
   bool isBpearlLidar_;
