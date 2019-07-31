@@ -88,6 +88,20 @@ void RawData::loadConfigFile(ros::NodeHandle node, ros::NodeHandle private_nh)
 
   ROS_INFO_STREAM("[cloud][rawdata] initialize resolution type: " << (dis_resolution_mode_?"1 cm":"0.5 cm") << ", intensity mode: " << intensity_mode_);
 
+  private_nh.param<float>("start_clip_angle_deg", start_clip_angle_, 0.F);
+  private_nh.param<float>("end_clip_angle_deg", end_clip_angle_, 360.F);
+
+  assert(std::abs(start_clip_angle_) <= 360.F);
+  assert(std::abs(end_clip_angle_) <= 360.F);
+
+  start_clip_angle_ = std::fmod(start_clip_angle_ + 360.F, 360.F);
+  end_clip_angle_ = std::fmod(end_clip_angle_ + 360.F, 360.F);
+
+  ROS_INFO("Clipping horizontal angle to range [%f, %f] degree", start_clip_angle_, end_clip_angle_);
+
+  start_clip_angle_ = static_cast<float>(start_clip_angle_ * M_PI / 180.);
+  end_clip_angle_ = static_cast<float>(end_clip_angle_ * M_PI / 180.);
+
   if (model == "RS16")
   {
     numOfLasers = 16;
@@ -844,6 +858,23 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
                                            RS16_BLOCK_TDURATION);
         }
         azimuth_corrected = ((int)round(azimuth_corrected_f)) % 36000;  // convert to integral value...
+        float arg_horiz = (float)azimuth_corrected / 18000.0f * M_PI;
+        float arg_horiz_orginal = arg_horiz;
+
+        if (start_clip_angle_< end_clip_angle_)
+        {
+          if (arg_horiz < start_clip_angle_ || arg_horiz > end_clip_angle_)
+          {
+            continue;
+          }
+        }
+        else
+        {
+          if (arg_horiz < start_clip_angle_ && arg_horiz > end_clip_angle_)
+          {
+            continue;
+          }
+        }
 
         union two_bytes tmp;
         tmp.bytes[1] = raw->blocks[block].data[k];
@@ -867,8 +898,6 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
           distance2 = distance2 * DISTANCE_RESOLUTION;
         }
 
-        float arg_horiz = (float)azimuth_corrected / 18000.0f * M_PI;
-        float arg_horiz_orginal = arg_horiz;
         float arg_vert = VERT_ANGLE[dsr];
         pcl::PointXYZI point;
 
@@ -994,6 +1023,23 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
         }
         azimuth_corrected_f = azimuth + (azimuth_diff * ((dsr_temp * RS32_DSR_TOFFSET)) / RS32_BLOCK_TDURATION);
         azimuth_corrected = correctAzimuth(azimuth_corrected_f, dsr);
+        float arg_horiz_orginal = (float)azimuth_corrected_f / 18000.0f * M_PI;
+        float arg_horiz = (float)azimuth_corrected / 18000.0f * M_PI;
+
+        if (start_clip_angle_< end_clip_angle_)
+        {
+          if (arg_horiz < start_clip_angle_ || arg_horiz > end_clip_angle_)
+          {
+            continue;
+          }
+        }
+        else
+        {
+          if (arg_horiz < start_clip_angle_ && arg_horiz > end_clip_angle_)
+          {
+            continue;
+          }
+        }
 
         union two_bytes tmp;
         tmp.bytes[1] = raw->blocks[block].data[k];
@@ -1007,8 +1053,6 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
         float distance2 = pixelToDistance(distance, dsr);
         distance2 = distance2 * DISTANCE_RESOLUTION_NEW;
 
-        float arg_horiz_orginal = (float)azimuth_corrected_f / 18000.0f * M_PI;
-        float arg_horiz = (float)azimuth_corrected / 18000.0f * M_PI;
         float arg_vert = VERT_ANGLE[dsr];
         pcl::PointXYZI point;
 
