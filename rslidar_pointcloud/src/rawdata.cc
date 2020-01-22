@@ -19,7 +19,11 @@
  */
 #include "rawdata.h"
 
+#include <xmlrpcpp/XmlRpcValue.h>
+
 #include <limits>
+#include <stdexcept>
+#include <string>
 
 namespace rslidar_rawdata
 {
@@ -91,19 +95,57 @@ void RawData::loadConfigFile(ros::NodeHandle node, ros::NodeHandle private_nh)
   ROS_INFO_STREAM("[cloud][rawdata] initialize resolution type: " << (dis_resolution_mode_ ? "1 cm" : "0.5 cm")
                                                                   << ", intensity mode: " << intensity_mode_);
 
-  private_nh.param<float>("start_clip_angle_deg", start_clip_angle_, 0.F);
-  private_nh.param<float>("end_clip_angle_deg", end_clip_angle_, 360.F);
+  XmlRpc::XmlRpcValue cut_pairs;
+  if (private_nh.getParam("cut_angles", cut_pairs))
+  {
+    if (cut_pairs.getType() != XmlRpc::XmlRpcValue::TypeArray)
+    {
+      const std::string fatal = "Parameter 'cut_angles' has to be of type array";
+      ROS_FATAL_STREAM(fatal);
+      throw std::invalid_argument(fatal);
+     }
 
-  assert(std::abs(start_clip_angle_) <= 360.F);
-  assert(std::abs(end_clip_angle_) <= 360.F);
+    for (size_t i = 0; i < cut_pairs.size(); ++i)
+    {
+       if (cut_pairs[i].getType() != XmlRpc::XmlRpcValue::TypeArray)
+       {
+         const std::string fatal = "Parameter 'cut_angles' has to be an array of arrays. Element with index "
+             + std::to_string(i) + " is not an array";
+         ROS_FATAL_STREAM(fatal);
+         throw std::invalid_argument(fatal);
+       }
 
-  start_clip_angle_ = std::fmod(start_clip_angle_ + 360.F, 360.F);
-  end_clip_angle_ = std::fmod(end_clip_angle_ + 360.F, 360.F);
+      if (cut_pairs[i].size() != 2)
+      {
+        const std::string fatal = "Parameter 'cut_angles' has to be an array of pairs. Element with index "
+            + std::to_string(i) + " is not a pair (size != 2)";
+        ROS_FATAL_STREAM(fatal);
+        throw std::invalid_argument(fatal);
+      }
 
-  ROS_INFO("Clipping horizontal angle to range [%f, %f] degree", start_clip_angle_, end_clip_angle_);
+      if (cut_pairs[i][0].getType() != XmlRpc::XmlRpcValue::TypeDouble
+            || cut_pairs[i][1].getType() != XmlRpc::XmlRpcValue::TypeDouble)
+      {
+        const std::string fatal = "Parameter 'cut_angles' has to be an array of double pairs. Pair with index "
+            + std::to_string(i) + " has non-double value";
+        ROS_FATAL_STREAM(fatal);
+        throw std::invalid_argument(fatal);
+      }
 
-  start_clip_angle_ = static_cast<float>(start_clip_angle_ * M_PI / 180.);
-  end_clip_angle_ = static_cast<float>(end_clip_angle_ * M_PI / 180.);
+      double start_cut_angle = cut_pairs[i][0];
+      double end_cut_angle = cut_pairs[i][1];
+
+      start_cut_angle = std::fmod(start_cut_angle + 360.0, 360.0);
+      end_cut_angle = std::fmod(end_cut_angle + 360.0, 360.0);
+
+      ROS_INFO("Cut between horizontal angle range [%f, %f] degrees", start_cut_angle, end_cut_angle);
+
+      int start_cut_angle_i = (int)start_cut_angle * 100;
+      int end_cut_angle_i = (int)end_cut_angle * 100;
+
+      cut_angles_.emplace_back(start_cut_angle_i, end_cut_angle_i);
+    }
+  }
 
   if (model == "RS16")
   {
@@ -920,22 +962,13 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
                                            RS16_BLOCK_TDURATION);
         }
         azimuth_corrected = ((int)round(azimuth_corrected_f)) % 36000;  // convert to integral value...
-        float arg_horiz = (float)azimuth_corrected / 18000.0f * M_PI;
-        float arg_horiz_orginal = arg_horiz;
 
-        if (start_clip_angle_< end_clip_angle_)
+        int arg_horiz = (azimuth_corrected + 36000) % 36000;
+        int arg_horiz_orginal = arg_horiz;
+
+        if (skipAngle(arg_horiz_orginal))
         {
-          if (arg_horiz < start_clip_angle_ || arg_horiz > end_clip_angle_)
-          {
-            continue;
-          }
-        }
-        else
-        {
-          if (arg_horiz < start_clip_angle_ && arg_horiz > end_clip_angle_)
-          {
-            continue;
-          }
+          continue;
         }
 
         union two_bytes tmp;
@@ -960,8 +993,6 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
           distance2 = distance2 * DISTANCE_RESOLUTION;
         }
 
-        int arg_horiz = (azimuth_corrected + 36000) % 36000;
-        int arg_horiz_orginal = arg_horiz;
         int arg_vert = ((VERT_ANGLE[dsr]) % 36000 + 36000) % 36000;
 
         pcl::PointXYZI point;
@@ -1090,22 +1121,13 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
         }
         azimuth_corrected_f = azimuth + (azimuth_diff * ((dsr_temp * RS32_DSR_TOFFSET)) / RS32_BLOCK_TDURATION);
         azimuth_corrected = correctAzimuth(azimuth_corrected_f, dsr);
-        float arg_horiz_orginal = (float)azimuth_corrected_f / 18000.0f * M_PI;
-        float arg_horiz = (float)azimuth_corrected / 18000.0f * M_PI;
 
-        if (start_clip_angle_< end_clip_angle_)
+        int arg_horiz_orginal = (int)azimuth_corrected_f % 36000;
+        int arg_horiz = azimuth_corrected;
+
+        if (skipAngle(arg_horiz))
         {
-          if (arg_horiz < start_clip_angle_ || arg_horiz > end_clip_angle_)
-          {
-            continue;
-          }
-        }
-        else
-        {
-          if (arg_horiz < start_clip_angle_ && arg_horiz > end_clip_angle_)
-          {
-            continue;
-          }
+          continue;
         }
 
         union two_bytes tmp;
@@ -1120,8 +1142,6 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
         float distance2 = pixelToDistance(distance, dsr);
         distance2 = distance2 * DISTANCE_RESOLUTION_NEW;
 
-        int arg_horiz_orginal = (int)azimuth_corrected_f % 36000;
-        int arg_horiz = azimuth_corrected;
         int arg_vert = ((VERT_ANGLE[dsr]) % 36000 + 36000) % 36000;
 
         pcl::PointXYZI point;
@@ -1246,6 +1266,32 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
       }
     }
   }
+}
+
+bool RawData::skipAngle(const int angle_horizontal)
+{
+  for (const auto& start_end_pair : cut_angles_)
+  {
+    const auto& start = start_end_pair.first;
+    const auto& end = start_end_pair.second;
+
+    if (start < end)
+    {
+      if (angle_horizontal >= start && angle_horizontal <= end)
+      {
+        return true;
+      }
+    }
+    else // passing the 360 deg mark, e.g. from 270 to 10 degree
+    {
+      if (angle_horizontal >= start || angle_horizontal <= end)
+      {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 }  // namespace rslidar_rawdata

@@ -31,7 +31,11 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/impl/transforms.hpp>
 #include <pcl_conversions/pcl_conversions.h>
+
 #include <stdio.h>
+#include <utility>
+#include <vector>
+
 namespace rslidar_rawdata
 {
 // static const float  ROTATION_SOLUTION_ = 0.18f;  //水平角分辨率 10hz
@@ -175,11 +179,11 @@ private:
   float Rz_;  // the optical center position in the lidar coordination in z direction
   int start_angle_;
   int end_angle_;
+  bool skipAngle(const int angle_horizontal);
   float max_distance_;
   float min_distance_;
   int dis_resolution_mode_;
-  float start_clip_angle_;
-  float end_clip_angle_;
+  std::vector<std::pair<int, int>> cut_angles_;
   int return_mode_;
   bool info_print_flag_;
   bool isBpearlLidar_;
