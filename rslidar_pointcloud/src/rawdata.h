@@ -31,7 +31,11 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl_ros/impl/transforms.hpp>
 #include <pcl_conversions/pcl_conversions.h>
+
 #include <stdio.h>
+#include <utility>
+#include <vector>
+
 namespace rslidar_rawdata
 {
 // static const float  ROTATION_SOLUTION_ = 0.18f;  //水平角分辨率 10hz
@@ -167,6 +171,8 @@ public:
   int intensityFactor;
 
 private:
+  bool skipAngle(const float angle_horizontal);
+
   float R1_;
   float R2_;
   bool angle_flag_;
@@ -175,8 +181,7 @@ private:
   float max_distance_;
   float min_distance_;
   int dis_resolution_mode_;
-  float start_clip_angle_;
-  float end_clip_angle_;
+  std::vector<std::pair<float, float>> cut_angles_;
   int return_mode_;
   bool info_print_flag_;
 };
