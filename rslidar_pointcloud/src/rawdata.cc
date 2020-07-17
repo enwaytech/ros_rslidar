@@ -899,6 +899,23 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
     unpack_RS32(pkt, pointcloud);
     return;
   }
+
+  std::vector<std::pair<double, int> > vert_angle_sorted;
+  for (int dsr = 0; dsr < RS16_SCANS_PER_FIRING; dsr++) {
+    std::pair<double, int> mapping(VERT_ANGLE[dsr], dsr);
+    vert_angle_sorted.push_back(mapping);
+  }
+  std::sort(vert_angle_sorted.begin(), vert_angle_sorted.end(),
+            [](std::pair<double, int> a, std::pair<double, int> b) {
+              return (a.first < b.first);
+            });
+
+  std::vector<int> dsr_mapping;
+  dsr_mapping.resize(vert_angle_sorted.size());
+  for (int i = 0; i < vert_angle_sorted.size(); i++) {
+    dsr_mapping[vert_angle_sorted[i].second] = i;
+  }
+
   float azimuth;  // 0.01 dgree
   float intensity;
   float azimuth_diff;
@@ -1004,7 +1021,7 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
           point.y = NAN;
           point.z = NAN;
           point.intensity = 0;
-          pointcloud->at(2 * this->block_num + firing, dsr) = point;
+          pointcloud->at(2 * this->block_num + firing, dsr_mapping[dsr]) = point;
         }
         else if (distance2 > max_distance_)
         {
@@ -1013,7 +1030,7 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
           point.y = std::numeric_limits<float>::infinity();
           point.z = std::numeric_limits<float>::infinity();
           point.intensity = 0;
-          pointcloud->at(2 * this->block_num + firing, dsr) = point;
+          pointcloud->at(2 * this->block_num + firing, dsr_mapping[dsr]) = point;
         }
         else if (distance2 < min_distance_)
         {
@@ -1022,7 +1039,7 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
           point.y = -std::numeric_limits<float>::infinity();
           point.z = -std::numeric_limits<float>::infinity();
           point.intensity = 0;
-          pointcloud->at(2 * this->block_num + firing, dsr) = point;
+          pointcloud->at(2 * this->block_num + firing, dsr_mapping[dsr]) = point;
         }
         else
         {
@@ -1034,7 +1051,7 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
                     Rx_ * this->sin_lookup_table_[arg_horiz_orginal];
           point.z = distance2 * this->sin_lookup_table_[arg_vert] + Rz_;
           point.intensity = intensity;
-          pointcloud->at(2 * this->block_num + firing, dsr) = point;
+          pointcloud->at(2 * this->block_num + firing, dsr_mapping[dsr]) = point;
         }
       }
     }
@@ -1043,6 +1060,22 @@ void RawData::unpack(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl
 
 void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointCloud<pcl::PointXYZI>::Ptr pointcloud)
 {
+  std::vector<std::pair<double, int> > vert_angle_sorted;
+  for (int dsr = 0; dsr < RS32_SCANS_PER_FIRING * RS32_FIRINGS_PER_BLOCK; dsr++) {
+    std::pair<double, int> mapping(VERT_ANGLE[dsr], dsr);
+    vert_angle_sorted.push_back(mapping);
+  }
+  std::sort(vert_angle_sorted.begin(), vert_angle_sorted.end(),
+            [](std::pair<double, int> a, std::pair<double, int> b) {
+              return (a.first < b.first);
+            });
+
+  std::vector<int> dsr_mapping;
+  dsr_mapping.resize(vert_angle_sorted.size());
+  for (int i = 0; i < vert_angle_sorted.size(); i++) {
+    dsr_mapping[vert_angle_sorted[i].second] = i;
+  }
+  
   float azimuth;  // 0.01 dgree
   float intensity;
   float azimuth_diff;
@@ -1153,7 +1186,7 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
           point.y = NAN;
           point.z = NAN;
           point.intensity = 0;
-          pointcloud->at(this->block_num, dsr) = point;
+          pointcloud->at(this->block_num, dsr_mapping[dsr]) = point;
         }
         else if (distance2 > max_distance_)
         {
@@ -1162,7 +1195,7 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
           point.y = std::numeric_limits<float>::infinity();
           point.z = std::numeric_limits<float>::infinity();
           point.intensity = 0;
-          pointcloud->at(this->block_num, dsr) = point;
+          pointcloud->at(this->block_num, dsr_mapping[dsr]) = point;
         }
         else if (distance2 < min_distance_)
         {
@@ -1171,7 +1204,7 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
           point.y = -std::numeric_limits<float>::infinity();
           point.z = -std::numeric_limits<float>::infinity();
           point.intensity = 0;
-          pointcloud->at(this->block_num, dsr) = point;
+          pointcloud->at(this->block_num, dsr_mapping[dsr]) = point;
         }
         else
         {
@@ -1182,7 +1215,7 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
                     Rx_ * this->sin_lookup_table_[arg_horiz_orginal];
           point.z = distance2 * this->sin_lookup_table_[arg_vert] + Rz_;
           point.intensity = intensity;
-          pointcloud->at(this->block_num, dsr) = point;
+          pointcloud->at(this->block_num, dsr_mapping[dsr]) = point;
         }
       }
     }
@@ -1250,7 +1283,7 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
           point.y = NAN;
           point.z = NAN;
           point.intensity = 0;
-          pointcloud->at(this->block_num, dsr) = point;
+          pointcloud->at(this->block_num, dsr_mapping[dsr]) = point;
         }
         else
         {
@@ -1261,7 +1294,7 @@ void RawData::unpack_RS32(const rslidar_msgs::rslidarPacket& pkt, pcl::PointClou
                     Rx_ * this->sin_lookup_table_[arg_horiz_orginal];
           point.z = distance2 * this->sin_lookup_table_[arg_vert] + Rz_;
           point.intensity = intensity;
-          pointcloud->at(this->block_num, dsr) = point;
+          pointcloud->at(this->block_num, dsr_mapping[dsr]) = point;
         }
       }
     }
