@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="visualization" default="false"/>
+  <include file="$(find rslidar_pointcloud)/launch/rs_bpearl_raw.launch">
+    <arg name="lidar_name" value="front_top"/>
+  </include>
+  <include file="$(find rslidar_pointcloud)/launch/rs_bpearl_raw.launch">
+    <arg name="lidar_name" value="left_top"/>
+  </include>
+  <include file="$(find rslidar_pointcloud)/launch/rs_bpearl_raw.launch">
+    <arg name="lidar_name" value="right_top"/>
+  </include>
+  <include file="$(find rslidar_pointcloud)/launch/rs_bpearl_raw.launch">
+    <arg name="lidar_name" value="rear_top"/>
+  </include>
+  <node name="rviz" pkg="rviz" type="rviz"  args="-d $(find rslidar_pointcloud)/rviz_cfg/rslidar.rviz" if="$(arg visualization)"/>
+  <!--include file="$(find enway_bringup)/launch/standalone_filter.launch"/-->
+</launch>
