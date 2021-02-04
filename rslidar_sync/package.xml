@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package>
   <name>rslidar_sync</name>
-  <version>1.0.0</version>
+  <version>1.0.3</version>
   <description>synchronizing lidar data with time stamps</description>
 
   <maintainer email="bxzhang@robosense.ai">baoxianzhang</maintainer>
